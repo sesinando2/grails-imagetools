@@ -33,7 +33,7 @@ class ImageTool {
      * Should a thumbnail be created only if it will be smaller in size than
      * the current image?
      */
-    boolean decreaseOnly = true;
+    boolean decreaseOnly = false;
 
     /**
      * Returns the height for the currently loaded image
@@ -88,7 +88,14 @@ class ImageTool {
         if (!mask) {
             FileSeekableStream fss = new FileSeekableStream(file);
             mask = JAI.create("stream", fss);
+            def imageTool = new ImageTool()
+            imageTool.image = mask
+            imageTool.thumbnailMin([width, height].max())
+            imageTool.swapSource()
+            imageTool.crop(imageTool.width - width, imageTool.height - height)
+            mask = imageTool.result
             masks[file] = mask
+            loadAlpha(file)
         }
     }
 
@@ -100,6 +107,12 @@ class ImageTool {
         if (!alpha) {
             FileSeekableStream fss = new FileSeekableStream(file);
             alpha = JAI.create("stream", fss);
+            def imageTool = new ImageTool()
+            imageTool.image = alpha
+            imageTool.thumbnailMin([width, height].max())
+            imageTool.swapSource()
+            imageTool.crop(imageTool.width - width, imageTool.height - height)
+            alpha = imageTool.result
             alphas[file] = alpha;
         }
     }
@@ -193,6 +206,36 @@ class ImageTool {
             params.add(new InterpolationNearest());//interpolation method
             result = JAI.create("scale", params);
         }
+    }
+
+    public void thumbnailMin(float edgeLength) {
+        if (height < edgeLength && width < edgeLength && decreaseOnly) {
+            result = image
+        }
+        else {
+            boolean tall = (height > width);
+            float modifier = edgeLength / (float) (tall ? width : height);
+            ParameterBlock params = new ParameterBlock();
+            params.addSource(image);
+            params.add(modifier);//x scale factor
+            params.add(modifier);//y scale factor
+            params.add(0.0F);//x translate
+            params.add(0.0F);//y translate
+            params.add(new InterpolationNearest());//interpolation method
+            result = JAI.create("scale", params);
+        }
+    }
+
+    public void setHeight(float height) {
+        ParameterBlock params = new ParameterBlock();
+        params.addSource(image);
+        float modifier = height / this.height
+        params.add(modifier);//x scale factor
+        params.add(modifier);//y scale factor
+        params.add(0.0F);//x translate
+        params.add(0.0F);//y translate
+        params.add(new InterpolationNearest());//interpolation method
+        result = JAI.create("scale", params);
     }
 
     /**
@@ -314,20 +357,11 @@ class ImageTool {
 
         RenderedOp imageRgb = bandSelect(image, 0, 1, 2)
         imageRgb = reloadImage(imageRgb, "temp")
-        println "imageRgb:(w:$imageRgb.width,h:$imageRgb.height)"
 
-        RenderedOp maskResized = resizeMask(imageRgb)
-        maskResized = reloadImage(maskResized, "mask-resized")
-        println "maskResized:(w:$maskResized.width,h:$maskResized.height)"
-
-        RenderedOp maskCropped = trimMask(maskResized, imageRgb)
-        maskCropped = reloadImage(maskCropped, "mask-cropped")
-        println "maskCropped:(w:$maskCropped.width,h:$maskCropped.height)"
-
-        def maskRgb = bandSelect(maskCropped, 0, 1, 2)
+        def maskRgb = bandSelect(mask, 0, 1, 2)
         maskRgb = reloadImage(maskRgb, "mask")
 
-        def maskAlpha = bandSelect(maskCropped, 3)
+        def maskAlpha = bandSelect(alpha, 3)
         maskAlpha = reloadImage(maskAlpha, "alpha")
 
         def params = new ParameterBlock()
@@ -343,7 +377,7 @@ class ImageTool {
     }
 
     private RenderedOp reloadImage(RenderedOp image, String fileName) {
-        fileName = System.currentTimeMillis() + "-${fileName}.jpg"
+        fileName = "${System.currentTimeMillis()}-${fileName}.jpg"
 
         def os = new FileOutputStream(fileName)
         JAI.create("encode", image, os, "JPEG", null)
@@ -354,34 +388,6 @@ class ImageTool {
 
         new File(fileName).delete()
         return image
-    }
-
-    private RenderedOp trimMask(RenderedOp maskResized, RenderedOp imageRgb) {
-        def edgeX = (maskResized.width as Double) - (imageRgb.width as Double)
-        def edgeY = (maskResized.height as Double) - (imageRgb.height as Double)
-        def xOrigin = edgeX / 2.0
-        def yOrigin = edgeY / 2.0
-        def params = new ParameterBlock();
-        params.addSource(maskResized);
-        params.add(xOrigin as float);//x origin
-        params.add(yOrigin as float);//y origin
-        params.add((float) (maskResized.width - edgeX));//width
-        params.add((float) (maskResized.height - edgeY));//height
-        return JAI.create("crop", params, null)
-    }
-
-    private RenderedOp resizeMask(RenderedOp imageRgb) {
-        def xMod = imageRgb.width / (float) mask.width
-        def yMod = imageRgb.height / (float) mask.height
-        float modifier = xMod > yMod ? xMod : yMod
-        def params = new ParameterBlock();
-        params.addSource(mask);
-        params.add(modifier);//x scale factor
-        params.add(modifier);//y scale factor
-        params.add(0.0F);//x translate
-        params.add(0.0F);//y translate
-        params.add(new InterpolationNearest());//interpolation method
-        return JAI.create("scale", params);
     }
 
     private RenderedOp bandSelect(RenderedOp image, int... band) {
