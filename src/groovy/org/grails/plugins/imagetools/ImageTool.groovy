@@ -95,8 +95,8 @@ class ImageTool {
             imageTool.crop(imageTool.width - width, imageTool.height - height)
             mask = imageTool.result
             masks[file] = mask
-            loadAlpha(file)
         }
+        loadAlpha(file)
     }
 
     /**
