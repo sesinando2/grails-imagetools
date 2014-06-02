@@ -373,7 +373,6 @@ class ImageTool {
         params.add(CompositeDescriptor.NO_DESTINATION_ALPHA)
         result = JAI.create("composite", params, null);
         result = reloadImage(result, "temp")
-        println "result:(w:$result.width,h:$result.height)"
     }
 
     private RenderedOp reloadImage(RenderedOp image, String fileName) {
