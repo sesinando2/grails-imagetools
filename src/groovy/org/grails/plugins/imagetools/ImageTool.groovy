@@ -93,7 +93,7 @@ class ImageTool {
             imageTool.thumbnailMin([width, height].max())
             imageTool.swapSource()
             imageTool.crop(imageTool.width - width, imageTool.height - height)
-            mask = imageTool.result
+            mask = reloadImage(imageTool.result, "mask")
             masks[file] = mask
         }
         loadAlpha(file)
@@ -112,7 +112,7 @@ class ImageTool {
             imageTool.thumbnailMin([width, height].max())
             imageTool.swapSource()
             imageTool.crop(imageTool.width - width, imageTool.height - height)
-            alpha = imageTool.result
+            alpha = reloadImage(imageTool.result, "alpha")
             alphas[file] = alpha;
         }
     }
